@@ -1,6 +1,6 @@
 # README
 
-This is the README for your extension "markdown-note-supports".
+
 
 ## Features
 
