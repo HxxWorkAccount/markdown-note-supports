@@ -50,6 +50,27 @@ export class RenameProvider implements vscode.RenameProvider {
         }
         return edit;
     }
+
+    public async prepareRename(
+        document: TextDocument,
+        position: Position,
+        token: CancellationToken
+    ): Promise<Range | { range: Range; placeholder: string }> {
+        const line = document.lineAt(position.line);
+        const headerRegex = /^(#+\s+)(.+)$/;
+        const match = headerRegex.exec(line.text);
+        if (!match) {
+            return Promise.reject(new Error(`not title: ${line.text}`));
+        }
+        const prefix = match[1];
+        const headerText = match[2];
+        const headerStart = line.range.start.translate(0, prefix.length);
+        const headerEnd = headerStart.translate(0, headerText.length);
+        const range = new vscode.Range(headerStart, headerEnd);
+
+        // 可选：返回 placeholder
+        return { range, placeholder: headerText };
+    }
 }
 
 export function register(): vscode.Disposable {

@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as CommonUtils from 'utils/CommonUtils';
 import * as RenameProvider from './providers/RenameProvider';
-import { LabelsManager } from './providers/LabelsManager';
+import { DiagnosticProvider } from './providers/DiagnosticProvider';
+import { LabelManager } from './providers/LabelsManager';
 import { MdReferenceUpdater } from 'providers/MdReferenceUpdater';
 import { CacheManager } from 'CacheManager';
 import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonUtils';
@@ -9,8 +10,11 @@ import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonU
 export async function activate(context: vscode.ExtensionContext) {
     CommonUtils._setContext(context);
 
+    /* 注册 diagnostic 功能 */
+    DiagnosticProvider.getInstance();
+
     /* 读取 label 配置 */
-    await LabelsManager.getInstance().updateConfig()
+    await LabelManager.getInstance().updateConfig()
         .catch((error) => {
             logError(`load label failed, msg: ${error}`);
         });

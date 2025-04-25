@@ -65,6 +65,15 @@ export function inDir(abspath: string, dir: string): boolean {
     return !!relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
+export async function exists(uri: Uri): Promise<boolean> {
+    try {
+        await vscode.workspace.fs.stat(uri);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 export function getOldUriAfterDirMove(newUri: Uri, oldDir: string, newDir: string): Uri {
     /* 假设 oldDir 和 newDir 都是绝对路径 */
     oldDir = oldDir.endsWith('/') || oldDir.endsWith('\\') ? oldDir : oldDir + '/';

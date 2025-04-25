@@ -14,6 +14,15 @@ export class Label {
     public readonly childs: Label[] = [];
 
     public get isRoot() { return this.namepath === ''; }
+    public get fullPath(): string {
+        const names: string[] = [];
+        let label: Label | undefined = this;
+        while (label !== undefined && !label.isRoot) {
+            names.unshift(label.namepath);
+            label = label.parent;
+        }
+        return names.join('.');
+    }
 
     public constructor(name: string, parent?: Label) {
         if (name === '') {
@@ -50,9 +59,9 @@ export class Label {
     }
 }
 
-export class LabelsManager {
+export class LabelManager {
+    private static _instance: LabelManager | null = null;
     public static readonly defaultPath = 'labels.tree';
-    private static _instance: LabelsManager | null = null;
 
     /* 用户标注 label 时，必须以 uniqueLabel 为起点 */
     private _names = new Set<string>();
@@ -80,9 +89,9 @@ export class LabelsManager {
 
     public get root() { return this._root; }
 
-    public static getInstance(): LabelsManager {
+    public static getInstance(): LabelManager {
         if (!this._instance) {
-            this._instance = new LabelsManager();
+            this._instance = new LabelManager();
         }
         return this._instance;
     }
@@ -93,7 +102,7 @@ export class LabelsManager {
         let labelTreePath: Uri | undefined;
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (configPath === '' || !path.isAbsolute(configPath)) {
-            const relpath = configPath === '' ? LabelsManager.defaultPath : configPath;
+            const relpath = configPath === '' ? LabelManager.defaultPath : configPath;
             labelTreePath = workspaceFolder
                 ? Uri.file(path.join(workspaceFolder.uri.fsPath, relpath))
                 : undefined;
@@ -337,11 +346,26 @@ export class LabelsManager {
             return;
         }
 
-        /* 生成目标 label 集合 */
+        /* 生成目标 label 集合，剔除掉无用的 label */
         const targetLabels = new Set<Label>();
         for (const item of picked) {
             const labelItem = item as LabelItem;
-            targetLabels.add(labelItem.labelObj);
+            const removeList: Label[] = [];
+            let add = true;
+            for (const target of targetLabels) { /* 判断是否需要添加，以及移除无效的节点 */
+                if (labelItem.labelObj.isDescendantOf(target)) {
+                    add = false;
+                    break;
+                } else if (target.isDescendantOf(labelItem.labelObj)) {
+                    removeList.push(target);
+                }
+            }
+            for (const target of removeList) {
+                targetLabels.delete(target);
+            }
+            if (add) {
+                targetLabels.add(labelItem.labelObj);
+            }
         }
 
         /* 从 cache 中获取相关的引用 */
@@ -363,7 +387,14 @@ export class LabelsManager {
         });
 
         /* 生成报告内容 */
-        const contentList: string[] = ['# Select by labels results\n\n'];
+        const contentList: string[] = ['# Select By Labels\n\n'];
+
+        contentList.push(`Labels:\n`); /* 生成标签列表 */
+        for (const label of targetLabels) {
+            contentList.push(`- ${label.fullPath}\n`);
+        }
+
+        contentList.push('\n---\n\nRelated Sections:\n'); /* 生成引用列表 */
         for (const attr of attrs) {
             contentList.push(`- ${attr.generateReport(reportDir)}\n`);
         }
@@ -371,14 +402,18 @@ export class LabelsManager {
         const content = contentList.join('');
 
         /* 输出报告内容 */
-        const reportPath = path.join(reportDir.fsPath, `select_label_result.md`);
+        const reportPath = path.join(reportDir.fsPath, `select_by_labels_results.md`);
         await fs.writeFile(reportPath, content, 'utf-8').catch(error => {
             vscode.window.showErrorMessage(`Failed to create report. msg: ${error}`);
         });
 
         /* 打开 md 预览 */
         const doc = await vscode.workspace.openTextDocument(reportPath);
-        await vscode.window.showTextDocument(doc, { preview: false });
-        await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+        await vscode.window.showTextDocument(doc, { preview: true });
+        // await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+        const mpeExt = vscode.extensions.getExtension('shd101wyy.markdown-preview-enhanced');
+        if (mpeExt) { /* 用 Markdown Preview Enhanced 插件打开预览 */
+            await vscode.commands.executeCommand('markdown-preview-enhanced.openPreview', doc.uri);
+        }
     }
 }

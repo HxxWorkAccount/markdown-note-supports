@@ -1,33 +1,31 @@
 # README
 
-
-
 ## Features
 
-- automatically update markdown reference after moving file or directory.
+- Automatically update markdown links when you move files or folders.
 
-  Currently, it supports recognizing two type of formats: "Markdown references" and `src="path/to/file.ext"`. For example: `[haha](other_doc.md#header)`, `[image](./.images/myimage.png)`, `<img src=".Images/2022-04-27-21-41-41.png" style="zoom:25%">`, and so on.
+  Supports two formats: markdown links and `src="path/to/file.ext"`. For example: `[haha](other_doc.md#header)`, `[image](./.images/myimage.png)`, `<img src=".Images/2022-04-27-21-41-41.png" style="zoom:25%">`, etc.
 
-  Meanwhile, this plugin also preserves 'id', such as [test](test.md#header) — the '#header' part will remain intact after relocation.
+  The plugin also keeps the 'id' part, like `[test](test.md#header)` — the `#header` will stay correct after moving.
 
-  Finally, even after some rather aggressive stress-testing with file and directory movements, the plugin maintained accuracy. Thus, I consider it reasonably robust. The only problem is that VSCode does not auto-save modifications to unopened files. You must manually save to update the plugin’s cache; otherwise, subsequent file/directory movement might fail to update all references (potentially causing text loss or corruption).
+  Even after lots of file and folder moves, the plugin stays accurate. The only issue: VSCode does not auto-save files you haven’t opened. You must save manually to update the plugin’s cache. Otherwise, later moves might not update all links, which could cause missing or broken text.
 
-- update markdown reference after renaming header
+- Update markdown links after renaming a header
 
-  The plugin provides header renaming functionality. Press F2 to rename a markdown header, and it will automatically update all references to that header across other files.
+  The plugin lets you rename markdown headers with F2, and will update all links to that header in other files.
 
-- providing supports for 'header labels' like this:
+- Supports 'header labels' like this:
   ```md
   ### Matrix Transformation
-  <attr labels="math;lineary-algebra;matrix"></attr>
+  <attr labels="math;linear-algebra;matrix"></attr>
   ```
 
-  feel free to name your tag (only these characters are forbidden: .&"'<>), unicode is also support.
+  You can name your tag freely (except for these forbidden characters: .&"'<>). Unicode is supported.
 
 ### More about label
-To use the label feature, the plugin requires you to provide a label configuration file. You can specify its path by configuring `markdown-note-supports.labelTreePath`. By default, it reads the `./labels.tree` file under workspace.
+To use labels, you need a label config file. Set its path with `markdown-note-supports.labelTreePath`. By default, it reads `./labels.tree` in your workspace.
 
-The label configuration file should be like:
+The label config file should look like:
 ```tree
 - labelA
   - labelC
@@ -36,25 +34,25 @@ The label configuration file should be like:
 - labelB
 ```
 
-there is some constraint for label naming:
-- duplicate sibling labels are prohibited
-- labels must not contain certain special symbols (.%"'<>)
+Label rules:
+- No duplicate sibling labels
+- Labels can't have these symbols: .%"'<>
 
 #### Use label
-For now, label is only supported for headers. Labels must be declared in the line immediately following the header (empty lines in between are allowed but unnecessary). For example:
+Labels are only for headers. Put the label line right after the header (empty lines are allowed but not needed). For example:
 ```md
 ##### my header
 <attr labels="label1;label2;label3.label4"></attr>
 ```
 
-When the plugin loads the label configuration file, it will provide **auto-completion suggestions** based on the configuration.
+When the plugin loads the label config, it gives **auto-completion** based on it.
 
-![completion example](./image.png).
+![completion example](./image.png)
 
 #### Unique label
-When a label name is unique, you can reference it directly. On the other hand, if duplicate label names exist in the configuration (under different paths), you must build a 'labelpath' which start from a uniquely parent label.
+If a label name is unique, you can use it directly. If there are duplicate label names (in different paths), you must use a 'labelpath' starting from a unique ancestor label.
 
-for example, saying we had `labels.tree` below:
+For example, with this `labels.tree`:
 ```tree
 - somelabel
   - fruit
@@ -65,7 +63,7 @@ for example, saying we had `labels.tree` below:
     - samsung
 ```
 
-then we can use label like this:
+You can use labels like:
 ```md
 ##### Good fruit
 <attr labels="banana;fruit.apple"></attr>
@@ -73,34 +71,33 @@ then we can use label like this:
 ##### Phone
 <attr labels="samsung;phone brand.apple"></attr>
 
-##### Also work
+##### Others
 <attr labels="samsung;somelabel.phone brand.apple"></attr>
 ```
 
-Note that you can write full path like `somelabel.phone brand.apple` but that's not necessary for the plugin recognization.
+You can also write the full path like `somelabel.phone brand.apple`, it's not required for the plugin to recognize it, but more maintainable (because the unique label currently use may become invalid if new labels are added in the future).
 
 #### Select by labels
-The whole points of using labels is to categorizing knowledge (since knowledge isn't always be a tree-structured). For instance, if I want to view all content related to 'fruit' label, the plugin provides a `select by labels` command to gather all relevant header.
+Labels help you organize knowledge (since knowledge isn't always a 'tree-structure'). For example, to see all content with the 'fruit' label, use the `select by labels` command to gather all headers with 'fruit' label.
 
-When the command is executed, a selection window will appear.
+When you run the command, a selection window appears:
 ![](image-1.png)
 
-Unfortunately, VSCode currently doesn't provide a tree-selection API, so I had to simulate this functionality using a list view XD. You can then select the desired labels (multiple selections allowed).
+> Unfortunately, VSCode doesn't have a tree-selection API, so I uses a list view
 
-Note that if you select a parent label, all its child labels will be automatically included (though this isn't visually indicated on the UI).
+You can select multiple labels. If you select a parent label, all its child labels are included (not shown in the UI).
 
-After confirming your selection, the plugin will generate a markdown file containing a list of references to all relevant headers. You can click on any reference to jump directly to the corresponding section.
+After you confirm, the plugin makes a markdown file with links to all matching headers. Click a link to jump to that section.
 
 ![](image-2.png)
 
 ### Todo
-- [ ] warn invalid relative addresses in .md
-- [ ] warn invalid labels in .md
-
-
+- [x] Warn about invalid relative links in .md
+- [x] Warn about invalid labels in .md
 
 ## Release Notes
 
-empty
-
-
+### v0.0.2
+- Improved rename (F2)
+- Warn about invalid relative links in .md
+- Warn about invalid labels in .md

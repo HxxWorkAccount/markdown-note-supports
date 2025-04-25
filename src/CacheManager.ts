@@ -2,13 +2,14 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as CommonUtils from 'utils/CommonUtils';
 import * as StringUtils from 'utils/StringUtils';
+import * as DocumentUtils from 'utils/DocumentUtils';
 import * as SearchUtils from 'utils/SearchUtils';
 import * as PathUtils from 'utils/PathUtils';
 import * as WorkspaceUtils from 'utils/WorkspaceUtils';
-import { LabelsManager, Label } from 'providers/LabelsManager';
+import { LabelManager, Label } from 'providers/LabelsManager';
 import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonUtils';
 import { SearchOptions, MatchResult } from 'utils/SearchUtils';
-import { Uri, Range, Location, TextDocument, WorkspaceEdit } from 'vscode';
+import { Uri, Range, Location, TextDocument, WorkspaceEdit, EventEmitter } from 'vscode';
 import { promises as fs } from 'fs';
 
 export class LocalReference {
@@ -49,10 +50,7 @@ export class LocalReference {
     }
 
     public async getRange(): Promise<Range> {
-        const refDoc = await vscode.workspace.openTextDocument(this.source);
-        const start = refDoc.positionAt(this.startIndex);
-        const end = refDoc.positionAt(this.startIndex + this.length);
-        return new Range(start, end);
+        return DocumentUtils.getRange(this.source, this.startIndex, this.length);
     }
 
     public sameTarget(other: LocalReference): boolean {
@@ -61,39 +59,56 @@ export class LocalReference {
     }
 }
 
+export type LabelpathData = { labelpath: string, startIndex: number };
 export class AttrReference {
     public readonly source: Uri;
     public readonly startIndex: number;
     public readonly header: string; /* 目前只支持 attr 用于 header */
     public readonly raw: string;
 
-    public readonly labels: string[];
+    public readonly labelpaths: LabelpathData[];
 
     public constructor(source: Uri, startIndex: number, header: string, raw: string) {
         this.source = source;
         this.startIndex = startIndex;
         this.header = header;
         this.raw = raw;
-        this.labels = AttrReference.parseAttrLabels(raw);
+        this.labelpaths = AttrReference.parseAttrLabels(raw);
         // logInfo(`    recognize labels: ${this.labels}`);
     }
 
     public get length(): number { return this.raw.length; }
+    public *labels(): Generator<string> { 
+        for (const { labelpath } of this.labelpaths) {
+            yield labelpath;
+        }
+    }
+
+    public async getRange(): Promise<Range> {
+        return DocumentUtils.getRange(this.source, this.startIndex, this.length);
+    }
 
     public generateReport(from: Uri): string {
         const relpath = StringUtils.encodePath(PathUtils.getRelpath(from, this.source));
         const id = StringUtils.slugify(this.header);
-        const labels = this.labels.length > 0 ? this.labels.join(', ') : '';
-        return `[${path.basename(this.source.fsPath)}#${this.header}](${relpath}#${id}): ${labels}`;
+        const labelstr = this.labelpaths.length > 0 ? [...this.labels()].join(' | ') : '';
+        return `[${path.basename(this.source.fsPath)}#${this.header}](${relpath}#${id}): ${labelstr}`;
     }
 
-    public static parseAttrLabels(raw: string): string[] {
+    public static parseAttrLabels(raw: string): LabelpathData[] {
         const match = raw.match(/labels="([^"]*)"/);
-        if (!match) { return []; }
-        return match[1]
-            .split(';')
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+        if (!match || match.index === undefined) { return []; }
+        const results: LabelpathData[] = [];
+        const labelpaths = match[1].split(';');
+        let startIndex = match.index + 8;
+        for (const labelpath of labelpaths) {
+            const trimmedLabelpath = labelpath.trim();
+            if (trimmedLabelpath.length > 0) { /* 长度必须大于 0 才算 label */
+                results.push({ labelpath: trimmedLabelpath, startIndex });
+            }
+            startIndex += labelpath.length + 1; /* +1 是因为还有一个 ';' 符号 */
+        }
+        return results;
     }
 }
 
@@ -210,7 +225,7 @@ export class Cache {
             ? await SearchUtils.searchInDocument(this.uri, regex)
             : SearchUtils.searchInText(text, regex);
         for (const match of matches) {
-            this.attrReferences.push(new AttrReference(this.uri, match.index, match[1], match[2]));
+            this.attrReferences.push(new AttrReference(this.uri, match.index + match[0].indexOf(match[2]), match[1], match[2]));
             // logInfo(`    recognize attr for '${match[1]}', raw: '${match[2]}'.`);
         }
     }
@@ -218,27 +233,25 @@ export class Cache {
 
 export class CacheManager {
     private static instance?: CacheManager;
-
-    private readonly _caches: Map<string, Cache>; /* fspath -> Cache 的表 */
-    private _cacheChangeCounter: Map<string, number>;
-    private _pendingCache: Map<string, Promise<void>>;
-
-    private constructor() {
-        this._caches = new Map<string, Cache>();
-        this._cacheChangeCounter = new Map<string, number>();
-        this._pendingCache = new Map<string, Promise<void>>();
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-        watcher.onDidChange((uri) => { this._onDidChange(uri); });
-        watcher.onDidCreate((uri) => { this._onDidCreate(uri); });
-        watcher.onDidDelete((uri) => { this._onDidDelete(uri); });
-        CommonUtils.context!.subscriptions.push(watcher);
-    }
-
     public static getInstance(): CacheManager {
         if (!CacheManager.instance) {
             CacheManager.instance = new CacheManager();
         }
         return CacheManager.instance;
+    }
+
+    private readonly _caches = new Map<string, Cache>(); /* fspath -> Cache 的表 */
+    private _cacheChangeCounter = new Map<string, number>();
+    private _pendingCache = new Map<string, Promise<void>>();
+    private _afterCacheUri = new EventEmitter<Uri>();
+    public afterCacheUri = this._afterCacheUri.event;
+
+    private constructor() {
+        const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+        watcher.onDidChange((uri) => { this._onDidChange(uri); });
+        watcher.onDidCreate((uri) => { this._onDidCreate(uri); });
+        watcher.onDidDelete((uri) => { this._onDidDelete(uri); });
+        CommonUtils.context!.subscriptions.push(watcher);
     }
 
     public get cacheCount() { return this._caches.size; }
@@ -286,7 +299,7 @@ export class CacheManager {
         if (promise !== empty) {
             this._pendingCache.set(uri.fsPath, promise);
         }
-        await promise;
+        await promise.then(() => { this._afterCacheUri.fire(uri); });
     }
     public async cacheWorkspace(pattern?: string) {
         pattern = pattern ?? '**/*.md';
@@ -338,6 +351,10 @@ export class CacheManager {
         }
     }
 
+    public getCacheUnsafe(uri: Uri): Cache | undefined {
+        return this._caches.get(uri.fsPath);
+    }
+
     public findLabels(...labels: Label[]): AttrReference[] {
         function inLabels(target: Label) {
             for (const label of labels) {
@@ -350,10 +367,10 @@ export class CacheManager {
         const attrs: AttrReference[] = [];
         for (const cache of this._caches.values()) {
             for (const attrReference of cache.attrReferences) {
-                if (attrReference.labels.length === 0) { continue; }
-                const labelSet = new Set<string>(attrReference.labels);
+                if (attrReference.labelpaths.length === 0) { continue; }
+                const labelSet = new Set<string>(attrReference.labels());
                 for (const namepath of labelSet) {
-                    const label = LabelsManager.getInstance().getLabel(namepath);
+                    const label = LabelManager.getInstance().getLabel(namepath);
                     if (label === undefined) { continue; }
                     if (inLabels(label)) {
                         attrs.push(attrReference);

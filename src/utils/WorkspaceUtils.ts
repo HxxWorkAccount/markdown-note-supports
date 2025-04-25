@@ -16,3 +16,7 @@ export async function traverseWorkspaceFiles(
         await Promise.allSettled(batch.map(file => handler(file)));
     }
 }
+
+export function isOpened(uri: vscode.Uri): boolean {
+    return vscode.workspace.textDocuments.some(doc => doc.uri.fsPath === uri.fsPath);
+}
