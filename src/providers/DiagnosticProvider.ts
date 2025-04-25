@@ -52,7 +52,7 @@ export class DiagnosticProvider {
                 assert(ref.source.fsPath === uri.fsPath, `WTF?! ref.source !== cache key: ${ref.source}, ${uri}`);
                 diagnostics.push(new Diagnostic(
                     await ref.getRange(),
-                    `path not exists: $${ref.relpath}`,
+                    `path not exists: ${ref.relpath}`,
                     vscode.DiagnosticSeverity.Warning
                 ));
             } catch (error) {
