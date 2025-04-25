@@ -46,6 +46,12 @@ export class Label {
         if (this.parent === label) { return true; }
         return this.parent.isDescendantOf(label);
     }
+    public isAncestorOf(label: Label, includeSelf = true): boolean {
+        if (this === label) { return includeSelf; }
+        if (label.parent === undefined) { return false; }
+        if (label.parent === this) { return true; }
+        return this.isAncestorOf(label.parent);
+    }
 
     public toString(level: number = 0): string {
         const indent = '  '.repeat(level);
@@ -311,13 +317,18 @@ export class LabelManager {
     /* ---------------- commands ---------------- */
 
     private registerSummaryCommand() { /* 提供根据标签生成报告 */
-        context!.subscriptions.push(vscode.commands.registerCommand('markdown-note-supports.SelectByLabels', async () => {
-            await this.summaryCommand().catch(error => {
+        context!.subscriptions.push(vscode.commands.registerCommand('markdown-note-supports.SelectByLabelsUnion', async () => {
+            await this.summaryCommand(false).catch(error => {
+                logError(`summary failed. msg: ${error}`);
+            });
+        }));
+        context!.subscriptions.push(vscode.commands.registerCommand('markdown-note-supports.SelectByLabelsIntersection', async () => {
+            await this.summaryCommand(true).catch(error => {
                 logError(`summary failed. msg: ${error}`);
             });
         }));
     }
-    private async summaryCommand() {
+    private async summaryCommand(isIntersection: boolean) {
         type LabelItem = QuickPickItem & { labelObj: Label };
         const indent = '    ';
         const items: LabelItem[] = [];
@@ -353,10 +364,12 @@ export class LabelManager {
             const removeList: Label[] = [];
             let add = true;
             for (const target of targetLabels) { /* 判断是否需要添加，以及移除无效的节点 */
-                if (labelItem.labelObj.isDescendantOf(target)) {
+                if ((isIntersection && labelItem.labelObj.isAncestorOf(target)) || /* 如果是交集，则剔除先祖节点 */
+                    (!isIntersection && labelItem.labelObj.isDescendantOf(target))) { /* 如果是并集，则剔除后代节点 */
                     add = false;
                     break;
-                } else if (target.isDescendantOf(labelItem.labelObj)) {
+                } else if ((isIntersection && target.isAncestorOf(labelItem.labelObj)) || /* 剔除先祖 */
+                           (!isIntersection && target.isDescendantOf(labelItem.labelObj))) { /* 剔除后代 */
                     removeList.push(target);
                 }
             }
@@ -369,7 +382,7 @@ export class LabelManager {
         }
 
         /* 从 cache 中获取相关的引用 */
-        const attrs = CacheManager.getInstance().findLabels(...targetLabels);
+        const attrs = CacheManager.getInstance().findLabels(isIntersection, ...targetLabels);
         if (attrs.length === 0) {
             vscode.window.showInformationMessage('No labels found.');
             return;
@@ -387,7 +400,7 @@ export class LabelManager {
         });
 
         /* 生成报告内容 */
-        const contentList: string[] = ['# Select By Labels\n\n'];
+        const contentList: string[] = [`# Select By Labels (${isIntersection ? 'Intersection' : 'Union'})\n\n`];
 
         contentList.push(`Labels:\n`); /* 生成标签列表 */
         for (const label of targetLabels) {

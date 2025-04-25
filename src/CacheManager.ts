@@ -11,6 +11,7 @@ import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonU
 import { SearchOptions, MatchResult } from 'utils/SearchUtils';
 import { Uri, Range, Location, TextDocument, WorkspaceEdit, EventEmitter } from 'vscode';
 import { promises as fs } from 'fs';
+import { isMapIterator } from 'util/types';
 
 export class LocalReference {
     public readonly uri: Uri; /* 引用的资源位置 */
@@ -78,7 +79,7 @@ export class AttrReference {
     }
 
     public get length(): number { return this.raw.length; }
-    public *labels(): Generator<string> { 
+    public *labels(): Generator<string> {
         for (const { labelpath } of this.labelpaths) {
             yield labelpath;
         }
@@ -355,28 +356,34 @@ export class CacheManager {
         return this._caches.get(uri.fsPath);
     }
 
-    public findLabels(...labels: Label[]): AttrReference[] {
+    public findLabels(isIntersection: boolean, ...labels: Label[]): AttrReference[] {
+        const labelSet = new Set<Label>(labels);
         function inLabels(target: Label) {
-            for (const label of labels) {
-                if (target.isDescendantOf(label)) {
-                    return true;
-                }
+            for (const label of labelSet) {
+                if (target.isDescendantOf(label)) { return true; }
             }
             return false;
         }
+
+        const currLabelSet = new Set<Label>();
         const attrs: AttrReference[] = [];
         for (const cache of this._caches.values()) {
             for (const attrReference of cache.attrReferences) {
                 if (attrReference.labelpaths.length === 0) { continue; }
-                const labelSet = new Set<string>(attrReference.labels());
-                for (const namepath of labelSet) {
+                const namepathSet = new Set<string>(attrReference.labels());
+                for (const namepath of namepathSet) {
                     const label = LabelManager.getInstance().getLabel(namepath);
                     if (label === undefined) { continue; }
                     if (inLabels(label)) {
-                        attrs.push(attrReference);
-                        break;
+                        if (!isIntersection) { attrs.push(attrReference); break; }
+                        currLabelSet.add(label);
+                        if (isIntersection && currLabelSet.size === labelSet.size) {
+                            attrs.push(attrReference);
+                            break;
+                        }
                     }
                 }
+                currLabelSet.clear();
             }
         }
         return attrs;

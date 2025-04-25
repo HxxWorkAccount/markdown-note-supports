@@ -85,7 +85,9 @@ When you run the command, a selection window appears:
 
 > Unfortunately, VSCode doesn't have a tree-selection API, so I uses a list view
 
-You can select multiple labels. If you select a parent label, all its child labels are included (not shown in the UI).
+You can select multiple labels. There are two mode for selection: 'Intersection Mode' and 'Union Mode'. Intersection Mode requires the header match all labels in selection, while Union Mode requires the header match at least one label in selection.
+
+> Note that in Union Mode, a selected label's children are **implicitly be selected**. Similarly in Intersection Mode, a selected label's ancestors are **implicitly not selected**. But both of these situation would not display on the UI (since I have no way to listen the selection change event).
 
 After you confirm, the plugin makes a markdown file with links to all matching headers. Click a link to jump to that section.
 
@@ -96,6 +98,9 @@ After you confirm, the plugin makes a markdown file with links to all matching h
 - [x] Warn about invalid labels in .md
 
 ## Release Notes
+
+### v0.0.3
+- Select by labels: provide union mode and intersection mode
 
 ### v0.0.2
 - Improved rename (F2)
