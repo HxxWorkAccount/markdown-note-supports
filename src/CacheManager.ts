@@ -6,7 +6,7 @@ import * as DocumentUtils from 'utils/DocumentUtils';
 import * as SearchUtils from 'utils/SearchUtils';
 import * as PathUtils from 'utils/PathUtils';
 import * as WorkspaceUtils from 'utils/WorkspaceUtils';
-import { LabelManager, Label } from 'providers/LabelsManager';
+import { LabelManager, Label } from 'providers/LabelManager';
 import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonUtils';
 import { SearchOptions, MatchResult } from 'utils/SearchUtils';
 import { Uri, Range, Location, TextDocument, WorkspaceEdit, EventEmitter } from 'vscode';

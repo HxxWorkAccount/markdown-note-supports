@@ -2,7 +2,7 @@
   "name": "markdown-note-supports",
   "displayName": "markdown-note-supports",
   "description": "",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/HxxWorkAccount/markdown-note-supports.git"
@@ -26,6 +26,10 @@
       {
         "command": "markdown-note-supports.SelectByLabelsIntersection",
         "title": "Markdown Note Supports: Select By Labels (Intersection)"
+      },
+      {
+        "command": "markdown-note-supports.WrapSymbolWithEquationMark",
+        "title": "Markdown Note Supports: Wrap Symbol With Equation Mark"
       }
     ],
     "configuration": {

@@ -2,16 +2,18 @@ import * as vscode from 'vscode';
 import * as CommonUtils from 'utils/CommonUtils';
 import * as RenameProvider from './providers/RenameProvider';
 import { DiagnosticProvider } from './providers/DiagnosticProvider';
-import { LabelManager } from './providers/LabelsManager';
+import { LabelManager } from './providers/LabelManager';
 import { MdReferenceUpdater } from 'providers/MdReferenceUpdater';
+import { FormatProvider } from './providers/FormatProvider';
 import { CacheManager } from 'CacheManager';
 import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonUtils';
 
 export async function activate(context: vscode.ExtensionContext) {
     CommonUtils._setContext(context);
 
-    /* 注册 diagnostic 功能 */
+    /* 不依赖 cache 的功能 */
     DiagnosticProvider.getInstance();
+    FormatProvider.getInstance();
 
     /* 读取 label 配置 */
     await LabelManager.getInstance().updateConfig()

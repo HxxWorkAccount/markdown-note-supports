@@ -9,7 +9,7 @@ import { CacheManager, AttrReference, LocalReference } from 'CacheManager';
 import { FileMoveEvent, MoveFileWatcher } from 'MoveFileWatcher';
 import { logInfo, logWarning, logError, throwError, assert, context } from 'utils/CommonUtils';
 import { promises as fs } from 'fs';
-import { LabelManager } from './LabelsManager';
+import { LabelManager } from './LabelManager';
 
 export class DiagnosticProvider {
     private static _instance: DiagnosticProvider | null = null;

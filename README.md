@@ -14,13 +14,27 @@
 
   The plugin lets you rename markdown headers with F2, and will update all links to that header in other files.
 
-- Supports 'header labels' like this:
+- Supports [header labels](#more-about-label)
+
+  like this:
   ```md
   ### Matrix Transformation
   <attr labels="math;linear-algebra;matrix"></attr>
   ```
 
   You can name your tag freely (except for these forbidden characters: .&"'<>). Unicode is supported.
+
+- Wrap equation mark for selected text. **This features only meaningful for non-ascii notes**, because there's no way tell the different between english text and equation content.
+
+  For example, say we have raw text:
+  ```md
+  设P为可逆矩阵，则在{P}^{-1}{A}中，P称为“对{A}进行相似变换”。
+  ```
+
+  select these text and call command `markdown-note-supports.WrapSymbolWithEquationMark`, then plugin will replace these text to:
+  ```md
+  设 $P$ 为可逆矩阵，则在 ${P}^{-1}{A}$ 中，$P$ 称为“对 ${A}$ 进行相似变换”。
+  ```
 
 ### More about label
 To use labels, you need a label config file. Set its path with `markdown-note-supports.labelTreePath`. By default, it reads `./labels.tree` in your workspace.
@@ -96,8 +110,17 @@ After you confirm, the plugin makes a markdown file with links to all matching h
 ### Todo
 - [x] Warn about invalid relative links in .md
 - [x] Warn about invalid labels in .md
+- [ ] Cache file titles for title validation
+- [ ] Add `<details>` tag folding detection with toggle fold commands (for better preview alignment)
+- [ ] Parser upgrade: ignore link in code or codeblock
+- [ ] Formatter (likely requires a new parser. Parser logic should be abstracted for reuse, e.g., skipping codeblocks)
+- [ ] Improve label selection UI
+- [ ] Publish to VSCode Extension Marketplace
 
 ## Release Notes
+
+### v0.0.4
+- Wrap equation mark for selected text
 
 ### v0.0.3
 - Select by labels: provide union mode and intersection mode
