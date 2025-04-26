@@ -40,7 +40,13 @@
           "description": "path of label tree. Default is empty, read 'label.tree' from the workspace root directory."
         }
       }
-    }
+    },
+    "snippets": [
+      {
+        "language": "markdown",
+        "path": "./markdown-snippets.json"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

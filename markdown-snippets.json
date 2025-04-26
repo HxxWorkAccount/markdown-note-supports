@@ -1,0 +1,6 @@
+{
+  "Markdown Header Labels": {
+    "prefix": ["labels", "headerlabels", "hlabels"],
+    "body": "<attr labels=\"$0\"></attr>"
+  }
+}

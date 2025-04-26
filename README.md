@@ -119,6 +119,9 @@ After you confirm, the plugin makes a markdown file with links to all matching h
 
 ## Release Notes
 
+### v0.0.5
+- labels snippets
+
 ### v0.0.4
 - Wrap equation mark for selected text
 
