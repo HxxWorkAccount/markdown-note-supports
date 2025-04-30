@@ -33,7 +33,7 @@ export class RenameProvider implements vscode.RenameProvider {
         logInfo(`oldHeader: ${oldHeader}, old id: ${oldId}, new id: ${newId}`);
 
         /* 遍历所有缓存，查找引用当前 header 的 LocalReference */
-        await CacheManager.getInstance().updateTarget(edit, thisUri, oldId, thisUri, newId);
+        await CacheManager.getInstance().editTarget(edit, thisUri, oldId, thisUri, newId);
 
         /* 处理当前文件内的本地 id 引用（如 [xxx](#oldId)） */
         const docText = document.getText();

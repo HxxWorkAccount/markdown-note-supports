@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as CommonUtils from 'utils/CommonUtils';
 import * as RenameProvider from './providers/RenameProvider';
+import * as MiscProvider from './providers/MiscProvider';
 import { DiagnosticProvider } from './providers/DiagnosticProvider';
 import { LabelManager } from './providers/LabelManager';
 import { MdReferenceUpdater } from 'providers/MdReferenceUpdater';
@@ -12,6 +13,7 @@ export async function activate(context: vscode.ExtensionContext) {
     CommonUtils._setContext(context);
 
     /* 不依赖 cache 的功能 */
+    MiscProvider.registerMiscFeatures();
     DiagnosticProvider.getInstance();
     FormatProvider.getInstance();
 

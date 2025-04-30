@@ -29,7 +29,12 @@ export class DiagnosticProvider {
         context!.subscriptions.push(this._diagnosticCollection);
 
         /* 监听文件 cache 变化 */
-        CacheManager.getInstance().afterCacheUri((uri) => { this.updateDiagnostics(uri); });
+        CacheManager.getInstance().afterCacheUri((uri) => {
+            this.updateDiagnostics(uri);
+        });
+
+        /* 监听 label tree config 变化 */
+        LabelManager.getInstance().afterConfigUpdate(() => { this.updateAllDiagnostics(); });
 
         /* 监听文件的打开事件 */
         context!.subscriptions.push(
@@ -37,12 +42,28 @@ export class DiagnosticProvider {
                 this.updateDiagnostics(document.uri);
             })
         );
+
+        /* 监听文件变化 */
+        const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+        watcher.onDidDelete((uri) => { this._onDidDelete(uri); });
+        context!.subscriptions.push(watcher);
+
+        /* 监听文件移动 */
+        MoveFileWatcher.getInstance().onDidMove(this._onFileMoved, this);
     }
 
-    private async updateDiagnostics(uri: Uri) {
+    private async updateAllDiagnostics() {
+        this._diagnosticCollection.clear();
+        const docs = vscode.workspace.textDocuments.filter(
+            doc => doc.languageId === 'markdown' && doc.uri.fsPath.endsWith('.md')
+        );
+        await Promise.allSettled(docs.map(doc => this.updateDiagnostics(doc.uri)));
+    }
+
+    private async updateDiagnostics(uri: Uri) { /* 只能诊断已保存的文件 */
         const diagnostics: Diagnostic[] = [];
         if (!WorkspaceUtils.isOpened(uri)) { return; }
-        const document = await vscode.workspace.openTextDocument(uri);
+
         const cache = CacheManager.getInstance().getCacheUnsafe(uri); /* 获得当前 cache 直接分析 */
         if (cache === undefined) { return; }
 
@@ -64,7 +85,7 @@ export class DiagnosticProvider {
             try {
                 assert(attr.source.fsPath === uri.fsPath, `WTF?! attr.source !== cache key: ${attr.source}, ${uri}`);
                 for (const { labelpath, startIndex } of attr.labelpaths) {
-                    if (LabelManager.getInstance().getLabel(labelpath)) { continue; }
+                    if (LabelManager.getInstance().labelTree.getLabel(labelpath)) { continue; }
                     const range = await DocumentUtils.getRange(uri, attr.startIndex+startIndex, labelpath.length);
                     diagnostics.push(new Diagnostic(
                         range,
@@ -82,8 +103,31 @@ export class DiagnosticProvider {
             ...cache.attrReferences.map(async attr => { await diagnoseLabels(attr); }),
         ]);
 
-        this._diagnosticCollection.set(document.uri, diagnostics);
+        this._diagnosticCollection.set(uri, diagnostics);
         logInfo(`diagnose success: ${uri}`);
     }
 
+    private async clearNonexistentDiagnostics() {
+        for (const [uri] of this._diagnosticCollection) {
+            if (!PathUtils.exists(uri)) {
+                this._diagnosticCollection.delete(uri);
+            }
+        }
+    }
+
+    /* ---------------- Events ---------------- */
+
+    private async _onDidDelete(uri: Uri) {
+        if (uri.fsPath.endsWith('.md')) {
+            this._diagnosticCollection.delete(uri);
+        }
+    }
+
+    private async _onFileMoved(event: FileMoveEvent) {
+        if (event.oldUri.fsPath.endsWith('.md')) {
+            this._diagnosticCollection.delete(event.oldUri);
+        } else if (await PathUtils.isDirectoryAsync(event.oldUri.fsPath)) {
+            this.clearNonexistentDiagnostics(); /* 目录移动无脑清除无效信息 */
+        }
+    }
 }

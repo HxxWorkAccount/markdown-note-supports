@@ -2,7 +2,7 @@
   "name": "markdown-note-supports",
   "displayName": "markdown-note-supports",
   "description": "",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/HxxWorkAccount/markdown-note-supports.git"
@@ -30,6 +30,14 @@
       {
         "command": "markdown-note-supports.WrapSymbolWithEquationMark",
         "title": "Markdown Note Supports: Wrap Symbol With Equation Mark"
+      },
+      {
+        "command": "markdown-note-supports.InsertCurrentTime",
+        "title": "Markdown Note Supports: Insert Current Time"
+      },
+      {
+        "command": "markdown-note-supports.MinimizeLabelPathInFile",
+        "title": "Markdown Note Supports: Minimize Label Path In File"
       }
     ],
     "configuration": {

@@ -26,6 +26,8 @@ export class MdReferenceUpdater {
             let edit: WorkspaceEdit | undefined;
             logInfo(`Updating references from ${event.oldUri.fsPath} to ${event.newUri.fsPath}`);
 
+            await CacheManager.getInstance().saveAndCacheAllDirty(); /* 插件只希望在必要时执行自动保存 */
+
             const movingDir = await PathUtils.isDirectoryAsync(event.newUri.fsPath);
             const dirMdFiles = await vscode.workspace.findFiles(`${vscode.workspace.asRelativePath(event.newUri.fsPath)}/**/*.md`);
 
@@ -49,14 +51,14 @@ export class MdReferenceUpdater {
             }
             if (edit) {
                 await vscode.workspace.applyEdit(edit);
-                await Promise.allSettled(Array.from(edit.entries()).map(([uri]) => vscode.workspace.save(uri)));
+                // await Promise.allSettled(Array.from(edit.entries()).map(([uri]) => vscode.workspace.save(uri)));
             }
 
             /* 更新指向被移动文件的引用 */
             edit = new vscode.WorkspaceEdit();
             await this._editOuterReference(edit, event.oldUri, event.newUri);
             await vscode.workspace.applyEdit(edit);
-            await Promise.allSettled(Array.from(edit.entries()).map(([uri]) => vscode.workspace.save(uri)));
+            // await Promise.allSettled(Array.from(edit.entries()).map(([uri]) => vscode.workspace.save(uri)));
         } catch (err) {
             logError(`Failed to update references for file move: ${err instanceof Error ? err.stack : String(err)}`);
         }
@@ -84,6 +86,6 @@ export class MdReferenceUpdater {
     }
 
     private async _editOuterReference(edit: WorkspaceEdit, oldUri: Uri, newUri: Uri) {
-        await CacheManager.getInstance().updateUri(edit, oldUri, newUri);
+        await CacheManager.getInstance().editUri(edit, oldUri, newUri);
     }
 }

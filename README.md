@@ -89,7 +89,15 @@ You can use labels like:
 <attr labels="samsung;somelabel.phone brand.apple"></attr>
 ```
 
-You can also write the full path like `somelabel.phone brand.apple`, it's not required for the plugin to recognize it, but more maintainable (because the unique label currently use may become invalid if new labels are added in the future).
+You can also write the full path like `somelabel.phone brand.apple`, it's not required for the plugin to recognize it.
+
+#### Auto Refactoring
+When you modify the configuration, the plugin will analyze whether any old unique labels have become invalid (i.e., duplicate names occur) and automatically refactor the label paths that start with the unique label to make them valid. (So you can safely modify the label config file.)
+
+#### Rename label
+You can rename a label in the config file. The plugin will automatically refactor all labels in the markdown files that use this label.
+
+Note that you can use rename and [auto refactoring](#auto-refactoring) together. Feel free to add labels and execute renames. After saving, the plugin will automatically handle all modifications (at least, that’s the design goal).
 
 #### Select by labels
 Labels help you organize knowledge (since knowledge isn't always a 'tree-structure'). For example, to see all content with the 'fruit' label, use the `select by labels` command to gather all headers with 'fruit' label.
@@ -120,7 +128,22 @@ After you confirm, the plugin makes a markdown file with links to all matching h
 ## Release Notes
 
 ### v0.0.5
+- new command: insert current time
+- new command: minimize label path in file
 - labels snippets
+- label tree support comments (using `;` as separator)
+- label completion supports all labels (non-unique labels show best path)
+- auto fix label path in workspace when label tree config changed
+- rename label in label tree
+
+Fix:
+- clear none exist diagnostics
+- after moving a directory, links to directory don't updated correctly
+- label path can also start from first level label (which may not be unique)
+- link to current dir update incorrectly when moving folder.
+
+Optimize:
+- cache label completion
 
 ### v0.0.4
 - Wrap equation mark for selected text

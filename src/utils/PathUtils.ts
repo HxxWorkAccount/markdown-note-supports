@@ -61,6 +61,7 @@ export async function isDirectoryAsync(path: string): Promise<boolean> {
 }
 
 export function inDir(abspath: string, dir: string): boolean {
+    if (abspath === dir) { return true; } /* 相等直接返回 true */
     const relative = path.relative(dir, abspath);
     return !!relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
@@ -83,6 +84,7 @@ export function getOldUriAfterDirMove(newUri: Uri, oldDir: string, newDir: strin
     return Uri.file(oldPath);
 }
 export function getNewUriAfterDirMove(oldUri: Uri, oldDir: string, newDir: string): Uri {
+    if (oldUri.fsPath === oldDir) { return Uri.file(newDir);}
     oldDir = oldDir.endsWith('/') || oldDir.endsWith('\\') ? oldDir : oldDir + '/';
     newDir = newDir.endsWith('/') || newDir.endsWith('\\') ? newDir : newDir + '/';
     const oldPath = oldUri.fsPath;

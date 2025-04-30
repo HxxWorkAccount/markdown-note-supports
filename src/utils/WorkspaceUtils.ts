@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { Uri } from 'vscode';
+import { logError } from './CommonUtils';
 
 /**
  * 遍历项目所有文件（每批并发处理 15 个文件）
@@ -19,4 +21,35 @@ export async function traverseWorkspaceFiles(
 
 export function isOpened(uri: vscode.Uri): boolean {
     return vscode.workspace.textDocuments.some(doc => doc.uri.fsPath === uri.fsPath);
+}
+
+export async function saveEdit(edit: vscode.WorkspaceEdit): Promise<boolean> {
+    return await saveAll(Array.from(edit.entries()).map(([uri]) => uri));
+}
+
+export async function saveAll(uriList: Iterable<Uri>): Promise<boolean> {
+    const promises: Promise<boolean>[] = [];
+    async function dosave(uri: Uri): Promise<boolean> {
+        try {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            return await doc.save();
+        } catch (error) {
+            logError(`save file error: ${error}`);
+            return false;
+        }
+    }
+    for (const uri of uriList) {
+        promises.push(dosave(uri));
+    }
+    const results = await Promise.all(promises);
+    return results.every(result => result === true);
+}
+
+export async function saveAllDirty(filter?: (doc: vscode.TextDocument) => boolean): Promise<Uri[]> {
+    const dirtyDocs = filter === undefined
+        ? vscode.workspace.textDocuments.filter(doc => doc.isDirty)
+        : vscode.workspace.textDocuments.filter(doc => { return doc.isDirty && filter(doc); });
+    const savePromises = dirtyDocs.map(doc => doc.save());
+    await Promise.all(savePromises);
+    return dirtyDocs.map(doc => doc.uri);
 }

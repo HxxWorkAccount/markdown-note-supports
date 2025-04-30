@@ -6,12 +6,11 @@ import * as DocumentUtils from 'utils/DocumentUtils';
 import * as SearchUtils from 'utils/SearchUtils';
 import * as PathUtils from 'utils/PathUtils';
 import * as WorkspaceUtils from 'utils/WorkspaceUtils';
-import { LabelManager, Label } from 'providers/LabelManager';
+import { LabelManager, Label, LabelTree } from 'providers/LabelManager';
 import { logInfo, logWarning, logError, throwError, assert } from 'utils/CommonUtils';
 import { SearchOptions, MatchResult } from 'utils/SearchUtils';
 import { Uri, Range, Location, TextDocument, WorkspaceEdit, EventEmitter } from 'vscode';
 import { promises as fs } from 'fs';
-import { isMapIterator } from 'util/types';
 
 export class LocalReference {
     public readonly uri: Uri; /* 引用的资源位置 */
@@ -162,7 +161,7 @@ export class Cache {
             }
         }
     }
-    public async updateTarget(edit: WorkspaceEdit, oldUri: Uri, oldId: string | undefined, newUri: Uri, newId: string | undefined) {
+    public async modifyTarget(edit: WorkspaceEdit, oldUri: Uri, oldId: string | undefined, newUri: Uri, newId: string | undefined) {
         await this.traverseTarget(oldUri, oldId, async (ref) => {
             // LogInfo(`update ${oldId}, ref id: ${ref.id}, newId: ${newId}`);
             const refDoc = await vscode.workspace.openTextDocument(ref.source);
@@ -245,7 +244,7 @@ export class CacheManager {
     private _cacheChangeCounter = new Map<string, number>();
     private _pendingCache = new Map<string, Promise<void>>();
     private _afterCacheUri = new EventEmitter<Uri>();
-    public afterCacheUri = this._afterCacheUri.event;
+    public readonly afterCacheUri = this._afterCacheUri.event;
 
     private constructor() {
         const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
@@ -372,7 +371,7 @@ export class CacheManager {
                 if (attrReference.labelpaths.length === 0) { continue; }
                 const namepathSet = new Set<string>(attrReference.labels());
                 for (const namepath of namepathSet) {
-                    const label = LabelManager.getInstance().getLabel(namepath);
+                    const label = LabelManager.getInstance().labelTree.getLabel(namepath);
                     if (label === undefined) { continue; }
                     if (inLabels(label)) {
                         if (!isIntersection) { attrs.push(attrReference); break; }
@@ -389,7 +388,7 @@ export class CacheManager {
         return attrs;
     }
 
-    /* ---------------- Iteration ---------------- */
+    /* ---------------- Iteration Link Reference ---------------- */
 
     public async traverseUri(targetUri: Uri, handler: (ref: LocalReference) => void | Promise<void>) {
         for (const cache of this._caches.values()) {
@@ -402,19 +401,69 @@ export class CacheManager {
             await cache.traverseTarget(targetUri, targetId, handler);
         }
     }
-    public async updateUri(edit: WorkspaceEdit, oldUri: Uri, newUri: Uri) {
-        await this.updateTarget(edit, oldUri, undefined, newUri, undefined);
+    public async editUri(edit: WorkspaceEdit, oldUri: Uri, newUri: Uri) {
+        await this.editTarget(edit, oldUri, undefined, newUri, undefined);
     }
-    public async updateTarget(edit: WorkspaceEdit, oldUri: Uri, oldId: string | undefined, newUri: Uri, newId: string | undefined) {
+    public async editTarget(edit: WorkspaceEdit, oldUri: Uri, oldId: string | undefined, newUri: Uri, newId: string | undefined) {
         /* oldId === undefined 表示匹配任意 id，newId === undefined 表示使用 oldId */
         for (const cache of this._caches.values()) {
-            await cache.updateTarget(edit, oldUri, oldId, newUri, newId).catch((error) => {
+            await cache.modifyTarget(edit, oldUri, oldId, newUri, newId).catch((error) => {
                 logError(`    update target failed. target: ${path.basename(cache.uri.fsPath)}, msg: ${error}`);
             });
         }
     }
 
-    /* ---------------- File Changes ---------------- */
+    /* ---------------- Update Label Reference ---------------- */
+
+    public async traverseLabel(
+        target: Label,
+        handler: (label: Label, ref: AttrReference, labelIndex: number) => void | Promise<void>,
+        labelTree?: LabelTree,
+    ) {
+        if (labelTree === undefined && LabelManager.getInstance().labelTree.empty) { return; }
+        labelTree = labelTree ?? LabelManager.getInstance().labelTree;
+        const targetOnTree = labelTree.getLabel(target.fullPath); /* 从树上获取引用，这样下面直接通过地址判断是否匹配 */
+        if (targetOnTree === undefined) { return; }
+        for (const cache of this._caches.values()) {
+            for (const attrReference of cache.attrReferences) {
+                let i = 0;
+                for (const labelpath of attrReference.labels()) {
+                    const label = labelTree.getLabel(labelpath);
+                    if (label !== undefined && label.isDescendantOf(targetOnTree)) {
+                        try {
+                            await handler(label, attrReference, i);
+                        } catch (error) {
+                            logError(`traverseLabel error: ${error}`);
+                        }
+                    }
+                    i++;
+                }
+            }
+        }
+    }
+    public async editLabel(
+        edit: WorkspaceEdit,
+        target: Label,
+        getNewPath: (label: Label) => string | undefined,
+    ) {
+        async function modify(label: Label, attr: AttrReference, labelIndex: number) {
+            const newpath = getNewPath(label);
+            if (newpath === undefined) { return; }
+            const labelPathData = attr.labelpaths[labelIndex];
+            const labelpath = labelPathData.labelpath;
+            const startIndex = labelPathData.startIndex;
+            const range = await DocumentUtils.getRange(attr.source, attr.startIndex + startIndex, labelpath.length);
+            edit.replace(attr.source, range, newpath);
+        }
+        await this.traverseLabel(target, modify);
+    }
+
+    /* ---------------- File ---------------- */
+
+    public async saveAndCacheAllDirty() { /* 把当前 workspace 打开但未保存的 .md 都保存并缓存 */
+        const uriList = await WorkspaceUtils.saveAllDirty((doc) => doc.uri.fsPath.endsWith('.md'));
+        await Promise.allSettled(uriList.map(async (uri) => { await this.cacheUri(uri); }));
+    }
 
     private _onDidChange(uri: Uri) {
         logInfo(`file changed: ${vscode.workspace.asRelativePath(uri)}`);
